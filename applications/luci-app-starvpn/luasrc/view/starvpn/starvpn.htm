@@ -1,0 +1,93 @@
+<%+header%>
+<h1>星空组网</h1>
+
+<div id="status-display" class="alert alert-info">
+    <strong>状态:</strong> <span id="status-text">等待更新...</span>
+</div>
+
+<div class="buttons" style="width: 100%;">
+    <a id="console-button" onclick="login()" href="#" style="background-color: blue; color: white; display: block; padding: 10px 0; margin-bottom: 10px; text-align: center;">登录</a>
+    <a id="start-service"  href="#" style="background-color: green; color: white; display: block; padding: 10px 0; margin-bottom: 10px; text-align: center;">启动服务</a>
+    <a id="stop-service"   href="#" style="background-color: red; color: white; display: block; padding: 10px 0; text-align: center;">关闭服务</a>
+</div>
+<script src="https://cdn.starvpn.cn/stars.api/js/jquery-3.6.3.min.js"></script>
+<script>
+    function login() {
+        var consoleBtnText = $('#console-button').text();
+        if(consoleBtnText === '登录'){
+            var username = prompt("请输入您的用户名:");
+            var password = prompt("请输入您的密码:");
+            // 在这里你可以添加验证逻辑，比如检查用户名密码是否正确
+            // 这里只是简单的弹出输入框示例
+            if (username !== null && password !== null) {
+                $.post('/cgi-bin/luci/admin/services/starvpn/login', {username: username, password: password}, function(data) {
+                    alert(data.message);
+                    if (data.code === 0) {
+                        $('#console-button').text('退出登录');
+                    }
+                });
+            } else {
+                alert("您取消了登录操作。");
+            }
+        }else{
+            // 退出登录
+            $.post('/cgi-bin/luci/admin/services/starvpn/logout', function(data) {
+                $('#console-button').text('登录');
+                alert(data.message);
+            });
+        }
+    }
+    // 检查服务状态
+    function checkStatus() {
+        $.getJSON('/cgi-bin/luci/admin/services/starvpn/check_run_status', function(data) {
+            if(data.code === 0){
+                $.getJSON('/cgi-bin/luci/admin/services/starvpn/check_login_status', function(data) {
+                    if(data.code === 0){
+                        $("#console-button").text('退出登录');
+                        $.getJSON('/cgi-bin/luci/admin/services/starvpn/check_client_status', function(data) {
+                            if(data.code === 0){
+                                var status = data.data.status;
+                                if(starvpn === 0){
+                                    $('#status-text').text('未连接 - 请等待片刻');
+                                }else if(starvpn === 1){
+                                    $('#status-text').text('连接中 - 请等待片刻');
+                                }else if(starvpn === 2){
+                                    $('#status-text').text('已连接 - IP：'+data.data.clientInfo);
+                                }
+                            }else{
+                                $('#status-text').text(data.message);
+                            }
+                        });
+                    }else{
+                        $("#console-button").text('登录');
+                        $('#status-text').text(data.message);
+                    }
+                });
+            }else{
+                $('#status-text').text(data.message);
+            }
+        });
+    }
+
+    // 点击事件处理
+    $('#start-service').click(function() {
+        $.post('/cgi-bin/luci/admin/services/starvpn/start_service', function() {
+            alert('服务已启动');
+            checkStatus();
+        });
+    });
+
+    $('#stop-service').click(function() {
+        $.post('/cgi-bin/luci/admin/services/starvpn/stop_service', function() {
+            alert('服务已关闭');
+            checkStatus();
+        });
+    });
+
+    // 当页面加载后执行
+    checkStatus();
+    setInterval(checkStatus, 5000); // 每5秒检查一次状态
+
+</script>
+
+<%+footer%>
